@@ -61,6 +61,7 @@
 
 #include "ARTPWriter.h"
 #include <cutils/properties.h>
+#include "ExtendedUtils.h"
 
 namespace android {
 
@@ -1588,6 +1589,7 @@ status_t StagefrightRecorder::setupVideoEncoder(
     if (mCaptureTimeLapse) {
         encoder_flags |= OMXCodec::kOnlySubmitOneInputBufferAtOneTime;
     }
+    encoder_flags |= ExtendedUtils::getEncoderTypeFlags();
 
     sp<MediaSource> encoder = OMXCodec::Create(
             client.interface(), enc_meta,
