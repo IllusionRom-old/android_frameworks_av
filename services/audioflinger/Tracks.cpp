@@ -622,7 +622,7 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
             // and for fast tracks the track is not yet in the fast mixer thread's active set.
             ServerProxy::Buffer buffer;
             buffer.mFrameCount = 1;
-            (void) mAudioTrackServerProxy->obtainBuffer(&buffer, true /*ackFlush*/);
+            (void) mAudioTrackServerProxy->obtainBuffer(&buffer);
         }
     } else {
         status = BAD_VALUE;
