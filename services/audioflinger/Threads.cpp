@@ -3936,10 +3936,9 @@ AudioFlinger::OffloadThread::OffloadThread(const sp<AudioFlinger>& audioFlinger,
     :   DirectOutputThread(audioFlinger, output, id, device, OFFLOAD),
         mHwPaused(false),
         mFlushPending(false),
-        mPausedBytesRemaining(0)
+        mPausedBytesRemaining(0),
+        mPreviousTrack(NULL)
 {
-    //FIXME: mStandby should be set to true by ThreadBase constructor
-    mStandby = true;
 }
 
 void AudioFlinger::OffloadThread::threadLoop_exit()
@@ -3976,13 +3975,24 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
         }
         Track* const track = t.get();
         audio_track_cblk_t* cblk = track->cblk();
-        // Only consider last track started for volume and mixer state control.
-        // In theory an older track could underrun and restart after the new one starts
-        // but as we only care about the transition phase between two tracks on a
-        // direct output, it is not a problem to ignore the underrun case.
-        sp<Track> l = mLatestActiveTrack.promote();
-        bool last = l.get() == track;
-
+        if (mPreviousTrack != NULL) {
+            if (t.get() != mPreviousTrack) {
+                // Flush any data still being written from last track
+                mBytesRemaining = 0;
+                if (mPausedBytesRemaining) {
+                    // Last track was paused so we also need to flush saved
+                    // mixbuffer state and invalidate track so that it will
+                    // re-submit that unwritten data when it is next resumed
+                    mPausedBytesRemaining = 0;
+                    // Invalidate is a bit drastic - would be more efficient
+                    // to have a flag to tell client that some of the
+                    // previously written data was lost
+                    mPreviousTrack->invalidate();
+                }
+            }
+        }
+        mPreviousTrack = t.get();
+        bool last = (i == (count - 1));
         if (track->isPausing()) {
             track->setPaused();
             if (last) {
@@ -4073,14 +4083,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                     track->mState = TrackBase::STOPPING_2; // so presentation completes after drain
                     // do not drain if no data was ever sent to HAL (mStandby == true)
                     if (last && !mStandby) {
-                        // do not modify drain sequence if we are already draining. This happens
-                        // when resuming from pause after drain.
-                        if ((mDrainSequence & 1) == 0) {
-                            sleepTime = 0;
-                            standbyTime = systemTime() + standbyDelay;
-                            mixerStatus = MIXER_DRAIN_TRACK;
-                            mDrainSequence += 2;
-                        }
+                        sleepTime = 0;
+                        standbyTime = systemTime() + standbyDelay;
+                        mixerStatus = MIXER_DRAIN_TRACK;
+                        mDrainSequence += 2;
                         if (mHwPaused) {
                             // It is possible to move from PAUSED to STOPPING_1 without
                             // a resume so we must ensure hardware is running
