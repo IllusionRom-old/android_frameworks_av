@@ -55,7 +55,7 @@ LOCAL_C_INCLUDES += \
     external/jpeg
 
 
-LOCAL_CFLAGS += -Wall -Wextra
+LOCAL_CFLAGS += -Wall -Wextra -Wno-error=narrowing
 
 ifeq ($(BOARD_USES_QCOM_LEGACY_CAM_PARAMS),true)
     LOCAL_CFLAGS += -DQCOM_LEGACY_CAM_PARAMS
